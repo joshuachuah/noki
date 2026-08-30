@@ -3,7 +3,7 @@ import Foundation
 import Observation
 
 enum IslandState: Equatable {
-    case hidden
+    case idle
     case peek
     case expanded
 }
@@ -14,8 +14,8 @@ func islandState(
     pausedFor: TimeInterval?
 ) -> IslandState {
     if hovering { return .expanded }
-    guard nowPlaying != nil else { return .hidden }
-    if let pausedFor, pausedFor >= 180 { return .hidden }
+    guard nowPlaying != nil else { return .idle }
+    if let pausedFor, pausedFor >= 180 { return .idle }
     return .peek
 }
 
@@ -73,7 +73,7 @@ final class IslandModel {
     func pointerExited() {
         hoverLeaveTask?.cancel()
         hoverLeaveTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(150))
+            try? await Task.sleep(for: .milliseconds(50))
             guard !Task.isCancelled else { return }
             self?.isHovering = false
         }

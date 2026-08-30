@@ -6,6 +6,16 @@ struct NotchGeometry: Equatable {
 
     var centerX: CGFloat { notchRect.midX }
 
+    /// Whether a screen-space pointer location is over the Notch. The top edge
+    /// is inclusive because the cursor pins to `screenFrame.maxY`, which
+    /// `CGRect.contains` would treat as outside.
+    func containsPointer(_ location: CGPoint) -> Bool {
+        location.x >= notchRect.minX
+            && location.x < notchRect.maxX
+            && location.y >= notchRect.minY
+            && location.y <= screenFrame.maxY
+    }
+
     static func builtIn(from screens: [NSScreen] = NSScreen.screens) -> NotchGeometry? {
         guard let screen = screens.first(where: { $0.safeAreaInsets.top > 0 }) else {
             return nil
@@ -38,4 +48,3 @@ struct NotchGeometry: Equatable {
         )
     }
 }
-

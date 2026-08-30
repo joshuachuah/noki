@@ -80,6 +80,19 @@ final class Spotify {
         _ = try? run("tell application \"Spotify\" to set sound volume to \(min(max(volume, 0), 100))")
     }
 
+    func readShuffling() throws -> Bool {
+        let value = try run("tell application \"Spotify\" to return shuffling as text")
+        switch value.lowercased() {
+        case "true": return true
+        case "false": return false
+        default: throw CommandError.malformedResponse
+        }
+    }
+
+    func setShuffling(_ isShuffling: Bool) {
+        _ = try? run("tell application \"Spotify\" to set shuffling to \(isShuffling)")
+    }
+
     func play(uri: String) {
         let escaped = uri.replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
