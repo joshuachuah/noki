@@ -33,4 +33,3 @@ struct IslandStateTests {
         #expect(islandState(nowPlaying: paused, hovering: false, pausedFor: 180) == .hidden)
     }
 }
-

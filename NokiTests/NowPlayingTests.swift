@@ -4,6 +4,18 @@ import Testing
 @testable import Noki
 
 struct NowPlayingTests {
+    @Test(arguments: [
+        (0.0, "0:00"),
+        (59.0, "0:59"),
+        (60.0, "1:00"),
+        (61.0, "1:01"),
+        (3_599.0, "59:59"),
+        (-1.0, "0:00"),
+    ])
+    func formatsTime(seconds: TimeInterval, expected: String) {
+        #expect(formatTime(seconds) == expected)
+    }
+
     @Test func estimatesProgressOnlyWhilePlaying() {
         let observedAt = Date(timeIntervalSinceReferenceDate: 100)
         let playing = NowPlaying(

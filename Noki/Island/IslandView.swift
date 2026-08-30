@@ -9,50 +9,38 @@ struct IslandView: View {
 
     private var size: CGSize {
         switch model.state {
-        case .hidden: CGSize(width: 200, height: 32)
+        case .hidden: CGSize(width: 252, height: 32)
         case .peek: CGSize(width: 252, height: 32)
-        case .expanded: CGSize(width: 540, height: 100)
+        case .expanded:
+            model.nowPlaying == nil
+                ? CGSize(width: 380, height: 100)
+                : CGSize(width: 380, height: 220)
         }
     }
 
     private var cornerRadius: CGFloat {
         switch model.state {
-        case .hidden: 12
+        case .hidden: 14
         case .peek: 14
-        case .expanded: 24
+        case .expanded: model.nowPlaying == nil ? 24 : 28
         }
     }
 
-    private var shape: UnevenRoundedRectangle {
-        UnevenRoundedRectangle(
-            topLeadingRadius: 0,
-            bottomLeadingRadius: cornerRadius,
-            bottomTrailingRadius: cornerRadius,
-            topTrailingRadius: 0
-        )
-    }
-
-    // Content waits for the shape to grow before fading in, but leaves
-    // immediately on collapse so nothing lingers while the shape shrinks.
-    private var contentAnimation: Animation {
-        model.state == .expanded
-            ? .easeOut(duration: 0.18).delay(0.12)
-            : .easeOut(duration: 0.1)
+    private var shape: IslandShape {
+        IslandShape(cornerRadius: cornerRadius)
     }
 
     var body: some View {
         VStack(spacing: 0) {
             ZStack(alignment: .top) {
-                shape.fill(model.state == .hidden ? Color.clear : .black)
+                shape
+                    .fill(.black)
 
                 content
-                    .opacity(model.state == .hidden ? 0 : 1)
-                    .animation(contentAnimation, value: model.state)
+                    .frame(width: size.width, height: size.height, alignment: .top)
+                    .clipShape(shape)
             }
             .frame(width: size.width, height: size.height)
-            // Clip so Expanded content never draws past the black shape while
-            // it is still shrinking down to Peek.
-            .clipShape(shape)
             .contentShape(shape)
             .onHover(perform: updateShapeHover)
             .animation(
@@ -64,44 +52,118 @@ struct IslandView: View {
 
             Spacer(minLength: 0)
         }
-        .frame(width: 550, height: 110)
+        .frame(width: 380 + IslandShape.flareRadius * 2, height: 220)
     }
 
     @ViewBuilder
     private var content: some View {
-        switch model.state {
-        case .hidden:
-            Color.clear
-        case .peek:
-            if let nowPlaying = model.nowPlaying {
-                PeekView(
-                    nowPlaying: nowPlaying,
-                    spotify: spotify,
-                    expand: model.pointerEntered
+        ZStack(alignment: .top) {
+            if model.state == .hidden {
+                IdleView()
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity.animation(.easeOut(duration: 0.12).delay(0.08)),
+                            removal: .opacity.animation(.easeOut(duration: 0.08))
+                        )
+                    )
+            }
+
+            if model.state == .peek, let nowPlaying = model.nowPlaying {
+                PeekView(nowPlaying: nowPlaying, spotify: spotify)
+                .transition(
+                    .asymmetric(
+                        insertion: .opacity.animation(.easeOut(duration: 0.12).delay(0.08)),
+                        removal: .opacity.animation(.easeOut(duration: 0.08))
+                    )
                 )
             }
-        case .expanded:
-            ExpandedView(
-                nowPlaying: model.nowPlaying,
-                pins: pinStore.pins,
-                pinLoadError: pinStore.loadError,
-                spotify: spotify,
-                editPins: pinStore.openInDefaultEditor
-            )
+
+            if model.state == .expanded {
+                ExpandedView(
+                    nowPlaying: model.nowPlaying,
+                    pins: pinStore.pins,
+                    pinLoadError: pinStore.loadError,
+                    spotify: spotify,
+                    editPins: pinStore.openInDefaultEditor
+                )
+                .allowsHitTesting(model.state == .expanded)
+                .transition(
+                    .asymmetric(
+                        insertion: .opacity.animation(.easeOut(duration: 0.18).delay(0.12)),
+                        removal: .opacity.animation(.easeOut(duration: 0.08))
+                    )
+                )
+            }
         }
     }
 
-    /// Hidden and Expanded use the whole visible shape as a hover target.
-    /// Peek owns its three smaller targets so artwork and playback controls
-    /// do not open the Island.
+    /// Leaving the shape closes the Island in every state. Entering it opens
+    /// the Island in Hidden and Expanded only. In Peek the Notch itself is the
+    /// open target (see `IslandPanelController`), so the artwork and playback
+    /// buttons at the Island's edges stay clickable.
     private func updateShapeHover(_ hovering: Bool) {
-        guard model.state != .peek else { return }
-
         if hovering {
+            guard model.state != .peek else { return }
             if model.nowPlaying == nil { pinStore.reload() }
             model.pointerEntered()
         } else {
             model.pointerExited()
         }
+    }
+}
+
+/// The Island's outline. The bottom corners are rounded like a pill. The top
+/// corners flare outward into the menu bar, the way the physical Notch does,
+/// so the Island reads as part of the Notch instead of a box hanging under it.
+/// The flares are drawn outside `rect`, so the panel is `flareRadius` wider on
+/// each side than the Island body.
+///
+/// Keeps the corner radius out of SwiftUI's spring while the frame resizes.
+private struct IslandShape: Shape {
+    static let flareRadius: CGFloat = 6
+
+    let cornerRadius: CGFloat
+
+    func path(in rect: CGRect) -> Path {
+        let flare = Self.flareRadius
+        let radius = min(cornerRadius, rect.width / 2, rect.height - flare)
+
+        // SwiftUI's `addArc` runs in a flipped coordinate space, so
+        // `clockwise: false` draws clockwise on screen and vice versa.
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX - flare, y: rect.minY))
+        path.addArc(
+            center: CGPoint(x: rect.minX - flare, y: rect.minY + flare),
+            radius: flare,
+            startAngle: .degrees(-90),
+            endAngle: .degrees(0),
+            clockwise: false
+        )
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - radius))
+        path.addArc(
+            center: CGPoint(x: rect.minX + radius, y: rect.maxY - radius),
+            radius: radius,
+            startAngle: .degrees(180),
+            endAngle: .degrees(90),
+            clockwise: true
+        )
+        path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.maxY))
+        path.addArc(
+            center: CGPoint(x: rect.maxX - radius, y: rect.maxY - radius),
+            radius: radius,
+            startAngle: .degrees(90),
+            endAngle: .degrees(0),
+            clockwise: true
+        )
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + flare))
+        path.addArc(
+            center: CGPoint(x: rect.maxX + flare, y: rect.minY + flare),
+            radius: flare,
+            startAngle: .degrees(180),
+            endAngle: .degrees(270),
+            clockwise: false
+        )
+        path.closeSubpath()
+        return path
     }
 }

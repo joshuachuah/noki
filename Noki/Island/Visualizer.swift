@@ -1,12 +1,27 @@
 import SwiftUI
 
 struct Visualizer: View {
+    enum Style {
+        case peek
+        case expanded
+
+        var phaseOffsets: [Double] {
+            switch self {
+            case .peek: [0.0, 1.8, 3.7]
+            case .expanded: [0.0, 1.3, 2.6, 3.9, 5.2]
+            }
+        }
+
+        var barWidth: CGFloat { self == .peek ? 2.5 : 3 }
+        var spacing: CGFloat { self == .peek ? 2 : 2.5 }
+        var height: CGFloat { self == .peek ? 11 : 18 }
+    }
+
     let isPlaying: Bool
     let accent: Color
+    var style: Style = .peek
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private let phaseOffsets = [0.0, 1.8, 3.7]
 
     var body: some View {
         TimelineView(
@@ -15,25 +30,25 @@ struct Visualizer: View {
                 paused: !isPlaying || reduceMotion
             )
         ) { timeline in
-            HStack(alignment: .bottom, spacing: 2) {
-                ForEach(phaseOffsets.indices, id: \.self) { index in
+            HStack(alignment: .bottom, spacing: style.spacing) {
+                ForEach(style.phaseOffsets.indices, id: \.self) { index in
                     Capsule()
                         .fill(accent)
                         .frame(
-                            width: 2.5,
+                            width: style.barWidth,
                             height: barHeight(index: index, date: timeline.date)
                         )
                 }
             }
-            .frame(height: 11, alignment: .bottom)
+            .frame(height: style.height, alignment: .bottom)
         }
     }
 
     private func barHeight(index: Int, date: Date) -> CGFloat {
-        guard isPlaying, !reduceMotion else { return 2.2 }
+        guard isPlaying, !reduceMotion else { return style.height * 0.2 }
         let elapsed = date.timeIntervalSinceReferenceDate
-        let wave = (sin(elapsed * 9 + phaseOffsets[index]) + 1) / 2
-        return 2.2 + wave * 8.8
+        let minimumHeight = style.height * 0.2
+        let wave = (sin(elapsed * 9 + style.phaseOffsets[index]) + 1) / 2
+        return minimumHeight + wave * style.height * 0.8
     }
 }
-

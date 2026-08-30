@@ -23,5 +23,22 @@ struct NowPlaying {
         let estimatedPosition = position + date.timeIntervalSince(observedAt)
         return min(max(estimatedPosition / duration, 0), 1)
     }
+
+    func elapsedLabel(at date: Date) -> String {
+        formatTime(estimatedPosition(at: date))
+    }
+
+    func remainingLabel(at date: Date) -> String {
+        "-\(formatTime(duration - estimatedPosition(at: date)))"
+    }
+
+    private func estimatedPosition(at date: Date) -> TimeInterval {
+        guard isPlaying else { return position }
+        return min(position + date.timeIntervalSince(observedAt), duration)
+    }
 }
 
+func formatTime(_ seconds: TimeInterval) -> String {
+    let wholeSeconds = max(Int(seconds), 0)
+    return "\(wholeSeconds / 60):\(String(format: "%02d", wholeSeconds % 60))"
+}

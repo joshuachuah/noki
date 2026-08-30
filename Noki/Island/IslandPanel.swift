@@ -7,9 +7,14 @@ final class IslandPanelController {
     private let pinStore: PinStore
     private let spotify: Spotify
     private var panel: NSPanel?
+    private var geometry: NotchGeometry?
     private var screenObserver: NSObjectProtocol?
+    private var mouseMonitors: [Any] = []
+    private var pointerWasOverNotch = false
 
-    private let panelSize = CGSize(width: 550, height: 110)
+    // 380 for the Island body plus 6 on each side for the top flares.
+    // Keep in sync with the outer frame in `IslandView`.
+    private let panelSize = CGSize(width: 392, height: 220)
 
     init(model: IslandModel, pinStore: PinStore, spotify: Spotify) {
         self.model = model
@@ -28,18 +33,48 @@ final class IslandPanelController {
                 self?.reposition()
             }
         }
+
+        // Opening the Island is driven by the raw cursor position rather than
+        // SwiftUI's `onHover`. Hover relies on tracking-area transitions, which
+        // can miss a cursor that jumps into the Notch in one event and stops
+        // against the screen edge. Global monitors only see events bound for
+        // other apps, so a local one covers the cursor over our own panel.
+        mouseMonitors = [
+            NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
+                MainActor.assumeIsolated { self?.pointerMoved() }
+            },
+            NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+                MainActor.assumeIsolated { self?.pointerMoved() }
+                return event
+            },
+        ].compactMap { $0 }
     }
 
     func stop() {
         if let screenObserver {
             NotificationCenter.default.removeObserver(screenObserver)
         }
+        mouseMonitors.forEach(NSEvent.removeMonitor)
+        mouseMonitors = []
         panel?.close()
         panel = nil
     }
 
+    /// Opens the Island on the transition into the Notch. Leaving is left to
+    /// `IslandView`'s hover, which knows the Island's current shape.
+    private func pointerMoved() {
+        guard let geometry else { return }
+        let isOverNotch = geometry.containsPointer(NSEvent.mouseLocation)
+        defer { pointerWasOverNotch = isOverNotch }
+        guard isOverNotch, !pointerWasOverNotch else { return }
+
+        if model.nowPlaying == nil { pinStore.reload() }
+        model.pointerEntered()
+    }
+
     private func reposition() {
-        guard let geometry = NotchGeometry.builtIn() else {
+        geometry = NotchGeometry.builtIn()
+        guard let geometry else {
             panel?.orderOut(nil)
             return
         }
@@ -75,4 +110,3 @@ final class IslandPanelController {
         return panel
     }
 }
-

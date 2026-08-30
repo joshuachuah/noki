@@ -3,7 +3,6 @@ import SwiftUI
 struct PeekView: View {
     let nowPlaying: NowPlaying
     let spotify: Spotify
-    let expand: () -> Void
 
     @State private var isHoveringPlayback = false
 
@@ -21,12 +20,7 @@ struct PeekView: View {
             .accessibilityLabel("Open \(nowPlaying.title) in Spotify")
             .help("Open song in Spotify")
 
-            Color.clear
-                .contentShape(Rectangle())
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onHover { hovering in
-                    if hovering { expand() }
-                }
+            Spacer(minLength: 0)
 
             Button(action: spotify.playPause) {
                 Group {
