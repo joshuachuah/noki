@@ -3,7 +3,7 @@ import Foundation
 import Observation
 
 enum IslandState: Equatable {
-    case idle
+    case hidden
     case peek
     case expanded
 }
@@ -14,8 +14,8 @@ func islandState(
     pausedFor: TimeInterval?
 ) -> IslandState {
     if hovering { return .expanded }
-    guard nowPlaying != nil else { return .idle }
-    if let pausedFor, pausedFor >= 180 { return .idle }
+    guard nowPlaying != nil else { return .hidden }
+    if let pausedFor, pausedFor >= 180 { return .hidden }
     return .peek
 }
 

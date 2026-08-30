@@ -1,5 +1,4 @@
 import AppKit
-import Observation
 import SwiftUI
 
 @MainActor
@@ -12,9 +11,10 @@ final class IslandPanelController {
     private var screenObserver: NSObjectProtocol?
     private var mouseMonitors: [Any] = []
     private var pointerWasOverNotch = false
-    private var resizeTask: Task<Void, Never>?
-    private var isRunning = false
-    private var observationGeneration = 0
+
+    // 380 for the Island body plus 6 on each side for the top flares.
+    // Keep in sync with the outer frame in `IslandView`.
+    private let panelSize = CGSize(width: 392, height: 220)
 
     init(model: IslandModel, pinStore: PinStore, spotify: Spotify) {
         self.model = model
@@ -23,9 +23,6 @@ final class IslandPanelController {
     }
 
     func start() {
-        guard !isRunning else { return }
-        isRunning = true
-        observationGeneration += 1
         reposition()
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
@@ -51,20 +48,14 @@ final class IslandPanelController {
                 return event
             },
         ].compactMap { $0 }
-        observePanelSize(generation: observationGeneration)
     }
 
     func stop() {
-        guard isRunning else { return }
-        isRunning = false
-        observationGeneration += 1
         if let screenObserver {
             NotificationCenter.default.removeObserver(screenObserver)
         }
-        screenObserver = nil
         mouseMonitors.forEach(NSEvent.removeMonitor)
         mouseMonitors = []
-        resizeTask?.cancel()
         panel?.close()
         panel = nil
     }
@@ -88,8 +79,7 @@ final class IslandPanelController {
             return
         }
 
-        let panelSize = targetPanelSize
-        let panel = panel ?? makePanel(size: panelSize)
+        let panel = panel ?? makePanel()
         let origin = CGPoint(
             x: geometry.centerX - panelSize.width / 2,
             y: geometry.screenFrame.maxY - panelSize.height
@@ -99,51 +89,9 @@ final class IslandPanelController {
         self.panel = panel
     }
 
-    /// Grows before SwiftUI expands, then waits for the collapse animation
-    /// before shrinking the window's clickable rectangle.
-    private func observePanelSize(generation: Int) {
-        withObservationTracking {
-            _ = model.state
-            _ = model.nowPlaying != nil
-        } onChange: { [weak self] in
-            Task { @MainActor [weak self] in
-                guard
-                    let self,
-                    self.isRunning,
-                    self.observationGeneration == generation
-                else { return }
-                self.resizeTask?.cancel()
-
-                let target = self.targetPanelSize
-                guard let panel = self.panel else {
-                    self.reposition()
-                    self.observePanelSize(generation: generation)
-                    return
-                }
-
-                let isShrinking = target.width < panel.frame.width || target.height < panel.frame.height
-                if isShrinking {
-                    self.resizeTask = Task { [weak self] in
-                        try? await Task.sleep(for: .milliseconds(400))
-                        guard !Task.isCancelled else { return }
-                        self?.reposition()
-                    }
-                } else {
-                    self.reposition()
-                }
-
-                self.observePanelSize(generation: generation)
-            }
-        }
-    }
-
-    private var targetPanelSize: CGSize {
-        IslandLayout.panelSize(for: model.state, hasNowPlaying: model.nowPlaying != nil)
-    }
-
-    private func makePanel(size: CGSize) -> NSPanel {
+    private func makePanel() -> NSPanel {
         let panel = NSPanel(
-            contentRect: CGRect(origin: .zero, size: size),
+            contentRect: CGRect(origin: .zero, size: panelSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false

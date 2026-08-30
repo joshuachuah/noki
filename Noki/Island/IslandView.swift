@@ -8,12 +8,19 @@ struct IslandView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var size: CGSize {
-        IslandLayout.bodySize(for: model.state, hasNowPlaying: model.nowPlaying != nil)
+        switch model.state {
+        case .hidden: CGSize(width: 252, height: 32)
+        case .peek: CGSize(width: 252, height: 32)
+        case .expanded:
+            model.nowPlaying == nil
+                ? CGSize(width: 380, height: 100)
+                : CGSize(width: 380, height: 220)
+        }
     }
 
     private var cornerRadius: CGFloat {
         switch model.state {
-        case .idle: 14
+        case .hidden: 14
         case .peek: 14
         case .expanded: model.nowPlaying == nil ? 24 : 28
         }
@@ -45,17 +52,13 @@ struct IslandView: View {
 
             Spacer(minLength: 0)
         }
-        .frame(
-            width: size.width + IslandLayout.flareRadius * 2,
-            height: size.height
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(width: 380 + IslandShape.flareRadius * 2, height: 220)
     }
 
     @ViewBuilder
     private var content: some View {
         ZStack(alignment: .top) {
-            if model.state == .idle {
+            if model.state == .hidden {
                 IdleView()
                     .transition(
                         .asymmetric(
@@ -95,7 +98,7 @@ struct IslandView: View {
     }
 
     /// Leaving the shape closes the Island in every state. Entering it opens
-    /// the Island in Idle and Expanded only. In Peek the Notch itself is the
+    /// the Island in Hidden and Expanded only. In Peek the Notch itself is the
     /// open target (see `IslandPanelController`), so the artwork and playback
     /// buttons at the Island's edges stay clickable.
     private func updateShapeHover(_ hovering: Bool) {
@@ -109,27 +112,6 @@ struct IslandView: View {
     }
 }
 
-/// Owns the dimensions shared by the AppKit panel and its SwiftUI content.
-enum IslandLayout {
-    static let flareRadius: CGFloat = 6
-
-    static func bodySize(for state: IslandState, hasNowPlaying: Bool) -> CGSize {
-        switch state {
-        case .idle, .peek:
-            CGSize(width: 252, height: 32)
-        case .expanded:
-            hasNowPlaying
-                ? CGSize(width: 380, height: 220)
-                : CGSize(width: 380, height: 100)
-        }
-    }
-
-    static func panelSize(for state: IslandState, hasNowPlaying: Bool) -> CGSize {
-        let bodySize = bodySize(for: state, hasNowPlaying: hasNowPlaying)
-        return CGSize(width: bodySize.width + flareRadius * 2, height: bodySize.height)
-    }
-}
-
 /// The Island's outline. The bottom corners are rounded like a pill. The top
 /// corners flare outward into the menu bar, the way the physical Notch does,
 /// so the Island reads as part of the Notch instead of a box hanging under it.
@@ -138,10 +120,12 @@ enum IslandLayout {
 ///
 /// Keeps the corner radius out of SwiftUI's spring while the frame resizes.
 private struct IslandShape: Shape {
+    static let flareRadius: CGFloat = 6
+
     let cornerRadius: CGFloat
 
     func path(in rect: CGRect) -> Path {
-        let flare = IslandLayout.flareRadius
+        let flare = Self.flareRadius
         let radius = min(cornerRadius, rect.width / 2, rect.height - flare)
 
         // SwiftUI's `addArc` runs in a flipped coordinate space, so

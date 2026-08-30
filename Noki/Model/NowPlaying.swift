@@ -33,8 +33,8 @@ struct NowPlaying {
     }
 
     private func estimatedPosition(at date: Date) -> TimeInterval {
-        let estimate = isPlaying ? position + date.timeIntervalSince(observedAt) : position
-        return min(max(estimate, 0), max(duration, 0))
+        guard isPlaying else { return position }
+        return min(position + date.timeIntervalSince(observedAt), duration)
     }
 }
 

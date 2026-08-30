@@ -21,30 +21,15 @@ struct IslandStateTests {
         #expect(islandState(nowPlaying: paused, hovering: true, pausedFor: 300) == .expanded)
     }
 
-    @Test func noNowPlayingIsIdle() {
-        #expect(islandState(nowPlaying: nil, hovering: false, pausedFor: nil) == .idle)
+    @Test func noNowPlayingIsHidden() {
+        #expect(islandState(nowPlaying: nil, hovering: false, pausedFor: nil) == .hidden)
     }
 
     @Test func recentNowPlayingPeeks() {
         #expect(islandState(nowPlaying: paused, hovering: false, pausedFor: 179.9) == .peek)
     }
 
-    @Test func longPausedNowPlayingIsIdle() {
-        #expect(islandState(nowPlaying: paused, hovering: false, pausedFor: 180) == .idle)
-    }
-
-    @Test func panelMatchesTheVisibleIslandSize() {
-        #expect(
-            IslandLayout.panelSize(for: .idle, hasNowPlaying: false)
-                == CGSize(width: 264, height: 32)
-        )
-        #expect(
-            IslandLayout.panelSize(for: .peek, hasNowPlaying: true)
-                == CGSize(width: 264, height: 32)
-        )
-        #expect(
-            IslandLayout.panelSize(for: .expanded, hasNowPlaying: true)
-                == CGSize(width: 392, height: 220)
-        )
+    @Test func longPausedNowPlayingIsHidden() {
+        #expect(islandState(nowPlaying: paused, hovering: false, pausedFor: 180) == .hidden)
     }
 }
