@@ -1,9 +1,7 @@
 import SwiftUI
 
-/// What the Island shows when nothing is playing (or a track has been paused
-/// long enough to count as idle). Mirrors `PeekView`'s layout so the two
-/// slots read the same way: the left one becomes artwork and the right one
-/// becomes the live visualizer the moment music starts.
+/// Shown when nothing is playing. Mirrors `PeekView`'s layout so the
+/// slots swap cleanly into artwork and visualizer when music starts.
 struct IdleView: View {
     private let tint = Color.white.opacity(0.35)
 

@@ -56,8 +56,7 @@ final class Spotify {
         open(uri: uri)
     }
 
-    /// Spotify's AppleScript dictionary exposes the artist name but not its
-    /// URI, so the artist link opens a scoped Spotify search.
+    /// AppleScript exposes the artist name but not its URI, so this opens a Spotify search instead.
     func openArtist(named artist: String) {
         guard let query = "artist:\(artist)"
             .addingPercentEncoding(withAllowedCharacters: .alphanumerics)

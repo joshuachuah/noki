@@ -8,14 +8,7 @@ struct IslandView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var size: CGSize {
-        switch model.state {
-        case .hidden: CGSize(width: 252, height: 32)
-        case .peek: CGSize(width: 252, height: 32)
-        case .expanded:
-            model.nowPlaying == nil
-                ? CGSize(width: 380, height: 100)
-                : CGSize(width: 380, height: 220)
-        }
+        model.state.size(hasNowPlaying: model.nowPlaying != nil)
     }
 
     private var cornerRadius: CGFloat {
@@ -97,10 +90,8 @@ struct IslandView: View {
         }
     }
 
-    /// Leaving the shape closes the Island in every state. Entering it opens
-    /// the Island in Hidden and Expanded only. In Peek the Notch itself is the
-    /// open target (see `IslandPanelController`), so the artwork and playback
-    /// buttons at the Island's edges stay clickable.
+    /// Leaving closes the Island. Entering opens it, except in Peek where
+    /// only the Notch opens it so the edge buttons stay clickable.
     private func updateShapeHover(_ hovering: Bool) {
         if hovering {
             guard model.state != .peek else { return }
@@ -112,13 +103,8 @@ struct IslandView: View {
     }
 }
 
-/// The Island's outline. The bottom corners are rounded like a pill. The top
-/// corners flare outward into the menu bar, the way the physical Notch does,
-/// so the Island reads as part of the Notch instead of a box hanging under it.
-/// The flares are drawn outside `rect`, so the panel is `flareRadius` wider on
-/// each side than the Island body.
-///
-/// Keeps the corner radius out of SwiftUI's spring while the frame resizes.
+/// The Island's outline: rounded bottom corners and top corners that flare
+/// outward like the Notch. The flares sit outside `rect`, so the panel is wider by `flareRadius` per side.
 private struct IslandShape: Shape {
     static let flareRadius: CGFloat = 6
 
@@ -128,8 +114,7 @@ private struct IslandShape: Shape {
         let flare = Self.flareRadius
         let radius = min(cornerRadius, rect.width / 2, rect.height - flare)
 
-        // SwiftUI's `addArc` runs in a flipped coordinate space, so
-        // `clockwise: false` draws clockwise on screen and vice versa.
+        // SwiftUI's coordinate space is flipped, so `clockwise` here means the opposite on screen.
         var path = Path()
         path.move(to: CGPoint(x: rect.minX - flare, y: rect.minY))
         path.addArc(

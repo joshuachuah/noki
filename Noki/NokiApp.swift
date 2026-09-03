@@ -46,8 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var spotifyObserver: SpotifyObserver?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // A hosted unit-test bundle launches the app executable first. Keep
-        // tests isolated from the real Notch and Spotify automation prompt.
+        // Skip startup under XCTest so tests never touch the Notch or Spotify.
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else {
             return
         }

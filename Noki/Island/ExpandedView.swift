@@ -123,6 +123,7 @@ private struct ArtistButton: View {
     }
 }
 
+/// A 44pt icon button with a hover highlight.
 private struct SlotButton: View {
     let symbol: String
     let label: String

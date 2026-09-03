@@ -2,12 +2,27 @@ import AppKit
 import Foundation
 import Observation
 
+/// The three sizes the Island can be in.
 enum IslandState: Equatable {
     case hidden
     case peek
     case expanded
 }
 
+extension IslandState {
+    /// The Island's rendered size. Shared by `IslandView` and `IslandPanelController`.
+    func size(hasNowPlaying: Bool) -> CGSize {
+        switch self {
+        case .hidden, .peek: CGSize(width: 252, height: 32)
+        case .expanded:
+            hasNowPlaying
+                ? CGSize(width: 380, height: 220)
+                : CGSize(width: 380, height: 100)
+        }
+    }
+}
+
+/// Picks the Island state: hover wins, then nothing playing or a long pause hides it.
 func islandState(
     nowPlaying: NowPlaying?,
     hovering: Bool,

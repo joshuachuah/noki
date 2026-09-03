@@ -11,6 +11,7 @@ final class IslandPanelController {
     private var screenObserver: NSObjectProtocol?
     private var mouseMonitors: [Any] = []
     private var pointerWasOverNotch = false
+    private var pointerWasOverIsland = false
 
     // 380 for the Island body plus 6 on each side for the top flares.
     // Keep in sync with the outer frame in `IslandView`.
@@ -34,11 +35,8 @@ final class IslandPanelController {
             }
         }
 
-        // Opening the Island is driven by the raw cursor position rather than
-        // SwiftUI's `onHover`. Hover relies on tracking-area transitions, which
-        // can miss a cursor that jumps into the Notch in one event and stops
-        // against the screen edge. Global monitors only see events bound for
-        // other apps, so a local one covers the cursor over our own panel.
+        // Track the raw cursor instead of SwiftUI hover, which misses a cursor that
+        // jumps straight into the Notch. Global monitors skip our own panel, so add a local one.
         mouseMonitors = [
             NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
                 MainActor.assumeIsolated { self?.pointerMoved() }
@@ -60,16 +58,35 @@ final class IslandPanelController {
         panel = nil
     }
 
-    /// Opens the Island on the transition into the Notch. Leaving is left to
-    /// `IslandView`'s hover, which knows the Island's current shape.
+    /// Opens the Island when the cursor enters the Notch.
     private func pointerMoved() {
         guard let geometry else { return }
-        let isOverNotch = geometry.containsPointer(NSEvent.mouseLocation)
+        let location = NSEvent.mouseLocation
+        let isOverNotch = geometry.containsPointer(location)
         defer { pointerWasOverNotch = isOverNotch }
-        guard isOverNotch, !pointerWasOverNotch else { return }
 
-        if model.nowPlaying == nil { pinStore.reload() }
-        model.pointerEntered()
+        if isOverNotch, !pointerWasOverNotch {
+            if model.nowPlaying == nil { pinStore.reload() }
+            model.pointerEntered()
+        }
+        updateClickThrough(at: location)
+    }
+
+    /// The panel is bigger than the visible Island, so only take mouse events
+    /// while the pointer is over the Island's current shape.
+    private func updateClickThrough(at location: CGPoint) {
+        guard let geometry, let panel else { return }
+        let size = model.state.size(hasNowPlaying: model.nowPlaying != nil)
+        let minX = geometry.centerX - size.width / 2
+        // Top edge is open-ended for the same reason as `containsPointer`.
+        let isOverIsland = location.x >= minX
+            && location.x < minX + size.width
+            && location.y >= geometry.screenFrame.maxY - size.height
+        panel.ignoresMouseEvents = !isOverIsland
+
+        // SwiftUI hover exit can't fire once the panel ignores events, so close from here.
+        if pointerWasOverIsland, !isOverIsland { model.pointerExited() }
+        pointerWasOverIsland = isOverIsland
     }
 
     private func reposition() {
@@ -101,7 +118,8 @@ final class IslandPanelController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
-        panel.ignoresMouseEvents = false
+        // Starts click-through; `updateClickThrough` takes events back over the Island.
+        panel.ignoresMouseEvents = true
         panel.isMovable = false
         panel.hidesOnDeactivate = false
         panel.contentView = NSHostingView(
