@@ -113,7 +113,9 @@ final class IslandPanelController {
             backing: .buffered,
             defer: false
         )
-        panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
+        // Stay below the fullscreen toolbar's tracking window. Sharing its level
+        // can intercept the pointer transition that dismisses the title bar.
+        panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         panel.isOpaque = false
         panel.backgroundColor = .clear
