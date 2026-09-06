@@ -32,4 +32,42 @@ struct IslandStateTests {
     @Test func longPausedNowPlayingIsHidden() {
         #expect(islandState(nowPlaying: paused, hovering: false, pausedFor: 180) == .hidden)
     }
+
+    @Test @MainActor func leavingKeepsTheIslandOpenBriefly() async throws {
+        let model = IslandModel()
+        model.updateNowPlaying(paused)
+        model.pointerEntered()
+        model.pointerExited()
+
+        try await Task.sleep(for: .milliseconds(75))
+        #expect(model.state == .expanded)
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(model.state == .peek)
+    }
+
+    @Test @MainActor func returningCancelsThePendingClose() async throws {
+        let model = IslandModel()
+        model.pointerEntered()
+        model.pointerExited()
+        try await Task.sleep(for: .milliseconds(75))
+        model.pointerEntered()
+
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(model.state == .expanded)
+
+        model.pointerExited()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(model.state == .hidden)
+    }
+
+    @Test @MainActor func continuedMovementOutsideDoesNotRestartTheCloseDelay() async throws {
+        let model = IslandModel()
+        model.pointerEntered()
+        model.pointerExited()
+        try await Task.sleep(for: .milliseconds(100))
+        model.pointerExited()
+
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(model.state == .hidden)
+    }
 }

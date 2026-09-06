@@ -82,15 +82,18 @@ final class IslandModel {
 
     func pointerEntered() {
         hoverLeaveTask?.cancel()
-        isHovering = true
+        hoverLeaveTask = nil
+        if !isHovering { isHovering = true }
     }
 
     func pointerExited() {
-        hoverLeaveTask?.cancel()
+        // Further movement outside must not keep postponing the same dismissal.
+        guard isHovering, hoverLeaveTask == nil else { return }
         hoverLeaveTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(50))
+            try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
             self?.isHovering = false
+            self?.hoverLeaveTask = nil
         }
     }
 

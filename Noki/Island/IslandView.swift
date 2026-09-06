@@ -4,6 +4,7 @@ struct IslandView: View {
     @Bindable var model: IslandModel
     @Bindable var pinStore: PinStore
     let spotify: Spotify
+    var onHitRegionChange: (IslandHitRegion) -> Void = { _ in }
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -35,7 +36,13 @@ struct IslandView: View {
             }
             .frame(width: size.width, height: size.height)
             .contentShape(shape)
-            .onHover(perform: updateShapeHover)
+            .background {
+                IslandHitRegionReporter(
+                    size: size,
+                    cornerRadius: cornerRadius,
+                    onChange: onHitRegionChange
+                )
+            }
             .animation(
                 reduceMotion
                     ? .easeOut(duration: 0.2)
@@ -89,23 +96,53 @@ struct IslandView: View {
             }
         }
     }
+}
 
-    /// Leaving closes the Island. Entering opens it, except in Peek where
-    /// only the Notch opens it so the edge buttons stay clickable.
-    private func updateShapeHover(_ hovering: Bool) {
-        if hovering {
-            guard model.state != .peek else { return }
-            if model.nowPlaying == nil { pinStore.reload() }
-            model.pointerEntered()
-        } else {
-            model.pointerExited()
-        }
+/// Interpolates with the frame's spring, rather than reporting only its destination size.
+private struct IslandHitRegionReporter: View, Animatable {
+    nonisolated var size: CGSize
+    let cornerRadius: CGFloat
+    let onChange: (IslandHitRegion) -> Void
+
+    nonisolated var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(size.width, size.height) }
+        set { size = CGSize(width: newValue.first, height: newValue.second) }
+    }
+
+    private var region: IslandHitRegion {
+        IslandHitRegion(
+            frame: CGRect(
+                x: (392 - size.width) / 2,
+                y: 0,
+                width: size.width,
+                height: size.height
+            ),
+            cornerRadius: cornerRadius
+        )
+    }
+
+    var body: some View {
+        Color.clear
+            .allowsHitTesting(false)
+            .onChange(of: region, initial: true) { _, newRegion in
+                onChange(newRegion)
+            }
+    }
+}
+
+/// The displayed outline in the panel's top-left coordinate space, including its flares.
+struct IslandHitRegion: Equatable {
+    let frame: CGRect
+    let cornerRadius: CGFloat
+
+    func contains(_ point: CGPoint) -> Bool {
+        IslandShape(cornerRadius: cornerRadius).path(in: frame).contains(point)
     }
 }
 
 /// The Island's outline: rounded bottom corners and top corners that flare
 /// outward like the Notch. The flares sit outside `rect`, so the panel is wider by `flareRadius` per side.
-private struct IslandShape: Shape {
+struct IslandShape: Shape {
     static let flareRadius: CGFloat = 6
 
     let cornerRadius: CGFloat
